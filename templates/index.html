@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clasificador de Vehículos (Web)</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="info-panel">
+            <h2>ESTADO DEL CLASIFICADOR</h2>
+            <p id="estado" class="estado">Cargando...</p>
+            <hr>
+            <h3>TIPO DE VEHÍCULO DETECTADO:</h3>
+            <p id="resultado" class="resultado">N/A</p>
+            <button id="btn" onclick="iniciar()">Iniciar Presentación</button>
+        </div>
+        <div class="visor">
+            <div id="visor" class="visor-content">Área de Visor</div>
+        </div>
+    </div>
+
+    <script>
+        let currentIndex = 0;
+        let timeoutId = null;
+
+        function limpiarTimeout() {
+            if (timeoutId) clearTimeout(timeoutId);
+        }
+
+        function mostrarTexto(texto) {
+            const visor = document.getElementById('visor');
+            visor.innerHTML = `<p>${texto}</p>`;
+            visor.style.backgroundImage = 'none';
+        }
+
+        function mostrarImagen(src) {
+            const visor = document.getElementById('visor');
+            visor.innerHTML = `<img src="${src}" alt="Imagen">`;
+        }
+
+        function actualizarEstado(texto, color = 'yellow') {
+            const estado = document.getElementById('estado');
+            estado.textContent = texto;
+            estado.style.color = color;
+        }
+
+        function actualizarResultado(texto) {
+            document.getElementById('resultado').textContent = texto;
+        }
+
+        function iniciar() {
+            limpiarTimeout();
+            currentIndex = 0;
+            document.getElementById('btn').textContent = "Siguiente Vehículo";
+            document.getElementById('btn').disabled = true;
+            siguientePaso();
+        }
+
+        function siguientePaso() {
+            fetch(`/data/${currentIndex}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.done) {
+                        actualizarEstado("FIN. Reiniciando.", "red");
+                        mostrarTexto("Presentación Finalizada");
+                        document.getElementById('btn').textContent = "Iniciar Presentación";
+                        document.getElementById('btn').disabled = false;
+                        return;
+                    }
+
+                    // Paso 1: Imagen original
+                    actualizarEstado("1. Imagen Original (2s)", "cyan");
+                    mostrarImagen(data.url);
+                    timeoutId = setTimeout(() => {
+                        // Paso 2: Canny
+                        actualizarEstado("2. Detección de Bordes Canny (3s)", "orange");
+                        mostrarImagen(`/canny/${currentIndex}?t=${Date.now()}`);
+                        timeoutId = setTimeout(() => {
+                            // Paso 3: Resultado
+                            actualizarEstado("3. Clasificado (Esperando)", "#00FF00");
+                            actualizarResultado(data.tipo);
+                            document.getElementById('btn').disabled = false;
+                            currentIndex++;
+                        }, 3000);
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error(err);
+                    actualizarEstado("Error al cargar datos", "red");
+                });
+        }
+
+        document.getElementById('btn').addEventListener('click', siguientePaso);
+    </script>
+</body>
+</html>
